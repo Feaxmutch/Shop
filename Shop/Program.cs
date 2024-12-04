@@ -24,6 +24,8 @@
 
         public int Money { get => _money; }
 
+        protected IReadOnlyList<Item> Items => _items;
+
         public void TakeMoney(int money)
         {
             _money += money;
@@ -34,17 +36,7 @@
             _items.Add(item);
         }
 
-        public void ShowItems()
-        {
-            Dictionary<string, List<Item>> itemsCounts = SortItems();
-
-            foreach (var itemCount in itemsCounts)
-            {
-                Console.WriteLine($"{itemCount.Key} - {itemCount.Value.Count} ({itemCount.Value[0].Price})");
-            }
-        }
-
-        public bool TryGiveItem(string name, out Item givedItem)
+        protected bool TryGiveItem(string name, out Item givedItem)
         {
             foreach (var item in _items)
             {
@@ -60,34 +52,10 @@
             return false;
         }
 
-        public int GiveMoney(int money)
+        protected int GiveMoney(int money)
         {
             _money -= money;
             return money;
-        }
-
-        public void ShowMoney()
-        {
-            Console.WriteLine($"Монеты: {Money}");
-        }
-
-        public Dictionary<string, List<Item>> SortItems()
-        {
-            Dictionary<string, List<Item>> itemsCounts = new();
-
-            foreach (var item in _items)
-            {
-                if (itemsCounts.ContainsKey(item.Name))
-                {
-                    itemsCounts[item.Name].Add(item);
-                }
-                else
-                {
-                    itemsCounts.Add(item.Name, new List<Item>());
-                }
-            }
-
-            return itemsCounts;
         }
     }
 
@@ -138,7 +106,7 @@
             _isServing = false;
         }
 
-        public void Deal()
+        private void Deal()
         {
             Console.Clear();
             ShowItems();
@@ -149,16 +117,15 @@
 
             if (TryGiveItem(name, out Item item))
             {
-                if (_customer.Money >= item.Price)
+                if (_customer.TryPay(item.Price, out int money))
                 {
-                    TakeMoney(_customer.GiveMoney(item.Price));
+                    TakeMoney(money);
                     _customer.TakeItem(item);
                     Console.WriteLine("Покупка успешна");
                 }
                 else
                 {
                     TakeItem(item);
-                    Console.WriteLine("Недостаточно монет");
                 }
             }
             else
@@ -168,6 +135,35 @@
 
             Console.ReadKey();
         }
+
+        private void ShowItems()
+        {
+            Dictionary<string, List<Item>> itemsCounts = SortItems();
+
+            foreach (var itemCount in itemsCounts)
+            {
+                Console.WriteLine($"{itemCount.Key} - {itemCount.Value.Count} ({itemCount.Value[0].Price})");
+            }
+        }
+
+        private Dictionary<string, List<Item>> SortItems()
+        {
+            Dictionary<string, List<Item>> itemsCounts = new();
+
+            foreach (var item in Items)
+            {
+                if (itemsCounts.ContainsKey(item.Name))
+                {
+                    itemsCounts[item.Name].Add(item);
+                }
+                else
+                {
+                    itemsCounts.Add(item.Name, new List<Item>());
+                }
+            }
+
+            return itemsCounts;
+        }
     }
 
     public class Player : Character
@@ -175,6 +171,26 @@
         public Player(int money) : base(money)
         {
 
+        }
+
+        public bool TryPay(int price, out int givedMovey)
+        {
+            if (Money >= price)
+            {
+                givedMovey = GiveMoney(price);
+                return true;
+            }
+            else
+            {
+                Console.WriteLine("Недостаточно монет");
+                givedMovey = 0;
+                return false;
+            }
+        }
+
+        public void ShowMoney()
+        {
+            Console.WriteLine($"Монеты: {Money}");
         }
     }
 
