@@ -7,86 +7,31 @@
             List<Item> items = new() { new("Яблоко", 10), new("Меч", 200), new("Щит", 150) };
             Seller seller = new(items, 15, 500);
             Player player = new(1000);
-            seller.Serv(player);
+            Shop shop = new(seller);
+            shop.Serv(player);
         }
     }
 
-    public abstract class Character
+    public class Shop
     {
-        private List<Item> _items;
-        private int _money;
+        private readonly Seller _seller;
 
-        public Character(int money)
+        public Shop(Seller seller)
         {
-            _items = new();
-            TakeMoney(money);
-        }
-
-        public int Money { get => _money; }
-
-        protected IReadOnlyList<Item> Items => _items;
-
-        public void TakeMoney(int money)
-        {
-            _money += money;
-        }
-
-        public void TakeItem(Item item)
-        {
-            _items.Add(item);
-        }
-
-        protected bool TryGiveItem(string name, out Item givedItem)
-        {
-            foreach (var item in _items)
-            {
-                if (item.Name == name)
-                {
-                    givedItem = item;
-                    _items.Remove(item);
-                    return true;
-                }
-            }
-
-            givedItem = null;
-            return false;
-        }
-
-        protected int GiveMoney(int money)
-        {
-            _money -= money;
-            return money;
-        }
-    }
-
-    public class Seller : Character
-    {
-        private const string CommandBuy = "1";
-        private const string CommandExit = "2";
-
-        private Player _customer;
-        private bool _isServing;
-
-        public Seller(List<Item> items, int count, int money) : base(money)
-        {
-            foreach (var item in items)
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    TakeItem(item.Clone() as Item);
-                }
-            }
+            _seller = seller;
         }
 
         public void Serv(Player customer)
         {
-            _customer = customer;
-            _isServing = true;
+            const string CommandBuy = "1";
+            const string CommandExit = "2";
 
-            while (_isServing)
+            bool isServing = true;
+
+            while (isServing)
             {
                 Console.Clear();
-                _customer.ShowMoney();
+                customer.ShowMoney();
                 Console.WriteLine($"{CommandBuy}) Купить предмет\n" +
                                   $"{CommandExit}) выйти из меню торговца");
                 string command = Console.ReadLine();
@@ -94,38 +39,40 @@
                 switch (command)
                 {
                     case CommandBuy:
-                        Deal();
+                        Deal(customer);
                         break;
 
                     case CommandExit:
-                        _isServing = false;
+                        isServing = false;
                         break;
                 }
             }
 
-            _isServing = false;
         }
 
-        private void Deal()
+        private void Deal(Player customer)
         {
             Console.Clear();
-            ShowItems();
-            _customer.ShowMoney();
+            _seller.ShowItems();
+            customer.ShowMoney();
 
             Console.WriteLine($"Введите название предмета который хотите купить");
             string name = Console.ReadLine();
 
-            if (TryGiveItem(name, out Item item))
+            if (_seller.IsHaveItem(name))
             {
-                if (_customer.TryPay(item.Price, out int money))
+                Item itemProduct = _seller.GiveItem(name);
+
+                if (customer.CanPay(itemProduct.Price))
                 {
-                    TakeMoney(money);
-                    _customer.TakeItem(item);
+                    _seller.TakeMoney(customer.GiveMoney(itemProduct.Price));
+                    customer.TakeItem(itemProduct);
                     Console.WriteLine("Покупка успешна");
                 }
                 else
                 {
-                    TakeItem(item);
+                    _seller.TakeItem(itemProduct);
+                    Console.WriteLine("Недостаточно монет");
                 }
             }
             else
@@ -135,14 +82,91 @@
 
             Console.ReadKey();
         }
+    }
 
-        private void ShowItems()
+    public abstract class Character
+    {
+        private List<Item> _items;
+
+        public Character(int money)
+        {
+            _items = new();
+            TakeMoney(money);
+        }
+
+        public int Money { get; protected set; }
+
+        protected IReadOnlyList<Item> Items => _items;
+
+        public void TakeMoney(int money)
+        {
+            Money += money;
+        }
+
+        public void TakeItem(Item item)
+        {
+            _items.Add(item);
+        }
+
+        protected Item GetItem(string name)
+        {
+            Item getedItem = null;
+
+            foreach (var item in _items)
+            {
+                if (item.Name == name)
+                {
+                    getedItem = item;
+                    return getedItem;
+                }
+            }
+
+            return getedItem;
+        }
+
+        protected void RemoveItem(Item item)
+        {
+            _items.Remove(item);
+        }
+    }
+
+    public class Seller : Character
+    {
+        public Seller(List<Item> items, int count, int money) : base(money)
+        {
+            Initialize(items, count);
+        }
+
+        public void ShowItems()
         {
             Dictionary<string, List<Item>> itemsCounts = SortItems();
 
             foreach (var itemCount in itemsCounts)
             {
                 Console.WriteLine($"{itemCount.Key} - {itemCount.Value.Count} ({itemCount.Value[0].Price})");
+            }
+        }
+
+        public bool IsHaveItem(string name)
+        {
+            return GetItem(name) != null;
+        }
+
+        public Item GiveItem(string name)
+        {
+            Item givedItem = GetItem(name);
+            RemoveItem(givedItem);
+            return givedItem;
+        }
+        
+        private void Initialize(List<Item> items, int count)
+        {
+            foreach (var item in items)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    TakeItem(item.Clone);
+                }
             }
         }
 
@@ -173,19 +197,15 @@
 
         }
 
-        public bool TryPay(int price, out int givedMovey)
+        public bool CanPay(int price)
         {
-            if (Money >= price)
-            {
-                givedMovey = GiveMoney(price);
-                return true;
-            }
-            else
-            {
-                Console.WriteLine("Недостаточно монет");
-                givedMovey = 0;
-                return false;
-            }
+            return Money >= price;
+        }
+
+        public int GiveMoney(int money)
+        {
+            Money -= money;
+            return money;
         }
 
         public void ShowMoney()
@@ -194,7 +214,7 @@
         }
     }
 
-    public class Item : ICloneable
+    public class Item
     {
         public Item(string name, int price)
         {
@@ -206,9 +226,6 @@
 
         public int Price { get; private set; }
 
-        public object Clone()
-        {
-            return new Item(Name, Price);
-        }
+        public Item Clone => new Item(Name, Price);
     }
 }
