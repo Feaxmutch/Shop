@@ -8,7 +8,7 @@
             Seller seller = new(items, 15, 500);
             Player player = new(1000);
             Shop shop = new(seller);
-            shop.Serv(player);
+            shop.Serve(player);
         }
     }
 
@@ -21,7 +21,7 @@
             _seller = seller;
         }
 
-        public void Serv(Player customer)
+        public void Serve(Player customer)
         {
             const string CommandBuy = "1";
             const string CommandExit = "2";
@@ -39,7 +39,7 @@
                 switch (command)
                 {
                     case CommandBuy:
-                        OpenBuyMenu(customer);
+                        Trading(customer);
                         break;
 
                     case CommandExit:
@@ -50,7 +50,7 @@
 
         }
 
-        private void OpenBuyMenu(Player customer)
+        private void Trading(Player customer)
         {
             Console.Clear();
             _seller.ShowItems();
@@ -59,9 +59,9 @@
             Console.WriteLine($"Введите название предмета который хотите купить");
             string itemName = Console.ReadLine();
 
-            if (_seller.IsHaveItem(itemName))
+            if (_seller.TryGetItem(itemName, out Item item))
             {
-                if (TryDeal(customer, itemName))
+                if (TryDeal(customer, item))
                 {
                     Console.WriteLine("Покупка успешна");
                 }
@@ -78,15 +78,14 @@
             Console.ReadKey();
         }
 
-        private bool TryDeal(Player customer, string itemName)
+        private bool TryDeal(Player customer, Item item)
         {
-            int price = _seller.GetItemPrice(itemName);
-            bool canPay = customer.CanPay(price);
+            bool canPay = customer.CanPay(item.Price);
 
             if (canPay)
             {
-                _seller.TakeMoney(customer.GiveMoney(price));
-                customer.TakeItem(_seller.GiveItem(itemName));
+                _seller.TakeMoney(customer.GiveMoney(item.Price));
+                customer.TakeItem(_seller.GiveItem(item));
             }
 
             return canPay;
@@ -140,9 +139,10 @@
             }
         }
 
-        public bool IsHaveItem(string name)
+        public bool TryGetItem(string name, out Item item)
         {
-            return GetItem(name) != null;
+            item = GetItem(name);
+            return item != null;
         }
 
         public int GetItemPrice(string name)
@@ -150,11 +150,10 @@
             return GetItem(name).Price;
         }
 
-        public Item GiveItem(string name)
+        public Item GiveItem(Item item)
         {
-            Item givedItem = GetItem(name);
-            RemoveItem(givedItem);
-            return givedItem;
+            RemoveItem(item);
+            return item;
         }
 
         protected Item GetItem(string name)
@@ -179,7 +178,7 @@
             {
                 for (int i = 0; i < count; i++)
                 {
-                    TakeItem(item.Clone);
+                    TakeItem(item.Clone());
                 }
             }
         }
@@ -240,6 +239,9 @@
 
         public int Price { get; private set; }
 
-        public Item Clone => new Item(Name, Price);
+        public Item Clone()
+        {
+            return new Item(Name, Price);
+        }
     }
 }
