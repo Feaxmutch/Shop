@@ -39,7 +39,7 @@
                 switch (command)
                 {
                     case CommandBuy:
-                        Deal(customer);
+                        OpenBuyMenu(customer);
                         break;
 
                     case CommandExit:
@@ -50,37 +50,46 @@
 
         }
 
-        private void Deal(Player customer)
+        private void OpenBuyMenu(Player customer)
         {
             Console.Clear();
             _seller.ShowItems();
             customer.ShowMoney();
 
             Console.WriteLine($"Введите название предмета который хотите купить");
-            string name = Console.ReadLine();
+            string itemName = Console.ReadLine();
 
-            if (_seller.IsHaveItem(name))
+            if (_seller.IsHaveItem(itemName))
             {
-                Item itemProduct = _seller.GiveItem(name);
-
-                if (customer.CanPay(itemProduct.Price))
+                if (TryDeal(customer, itemName))
                 {
-                    _seller.TakeMoney(customer.GiveMoney(itemProduct.Price));
-                    customer.TakeItem(itemProduct);
                     Console.WriteLine("Покупка успешна");
                 }
                 else
                 {
-                    _seller.TakeItem(itemProduct);
                     Console.WriteLine("Недостаточно монет");
                 }
             }
             else
             {
-                Console.WriteLine($"Предмета \"{name}\" нет в наличии");
+                Console.WriteLine($"Предмета \"{itemName}\" нет в наличии");
             }
 
             Console.ReadKey();
+        }
+
+        private bool TryDeal(Player customer, string itemName)
+        {
+            int price = _seller.GetItemPrice(itemName);
+            bool canPay = customer.CanPay(price);
+
+            if (canPay)
+            {
+                _seller.TakeMoney(customer.GiveMoney(price));
+                customer.TakeItem(_seller.GiveItem(itemName));
+            }
+
+            return canPay;
         }
     }
 
@@ -106,22 +115,6 @@
         public void TakeItem(Item item)
         {
             _items.Add(item);
-        }
-
-        protected Item GetItem(string name)
-        {
-            Item getedItem = null;
-
-            foreach (var item in _items)
-            {
-                if (item.Name == name)
-                {
-                    getedItem = item;
-                    return getedItem;
-                }
-            }
-
-            return getedItem;
         }
 
         protected void RemoveItem(Item item)
@@ -152,13 +145,34 @@
             return GetItem(name) != null;
         }
 
+        public int GetItemPrice(string name)
+        {
+            return GetItem(name).Price;
+        }
+
         public Item GiveItem(string name)
         {
             Item givedItem = GetItem(name);
             RemoveItem(givedItem);
             return givedItem;
         }
-        
+
+        protected Item GetItem(string name)
+        {
+            Item getedItem = null;
+
+            foreach (var item in Items)
+            {
+                if (item.Name == name)
+                {
+                    getedItem = item;
+                    return getedItem;
+                }
+            }
+
+            return getedItem;
+        }
+
         private void Initialize(List<Item> items, int count)
         {
             foreach (var item in items)
