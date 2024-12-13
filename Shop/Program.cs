@@ -284,16 +284,16 @@
 
         public int Price { get; private set; }
 
-        public static bool operator ==(Item a, Item b)
+        public static bool operator ==(Item item1, Item item2)
         {
-            bool equalsName = a.Name == b.Name;
-            bool equalsPrice = a.Price == b.Price;
+            bool equalsName = item1.Name == item2.Name;
+            bool equalsPrice = item1.Price == item2.Price;
             return equalsName && equalsPrice;
         }
 
-        public static bool operator !=(Item a, Item b)
+        public static bool operator !=(Item item1, Item item2)
         {
-            return a == b == false;
+            return item1 == item2 == false;
         }
 
         public Item Clone()
