@@ -47,7 +47,6 @@
                         break;
                 }
             }
-
         }
 
         private void Trading(Player customer)
@@ -92,19 +91,97 @@
         }
     }
 
+    public class Inventory
+    {
+        private List<Cell> _cells = new();
+
+        public IReadOnlyList<IReadOnlyCell> Cells => _cells;
+
+        public void AddItem(Item item)
+        {
+            if (TryGetCell(item, out Cell cell) == false)
+            {
+                cell = new Cell(item);
+                _cells.Add(cell);
+            }
+
+            cell.Add();
+        }
+
+        public void RemoveItem(Item item)
+        {
+            if (TryGetCell(item, out Cell cell))
+            {
+                cell.Substract();
+
+                if (cell.Count == 0)
+                {
+                    _cells.Remove(cell);
+                }
+            }
+            else
+            {
+                throw new ArgumentException("item was not found", nameof(item));
+            }
+        }
+
+        private bool TryGetCell(Item item, out Cell returnedCell)
+        {
+            foreach (var cell in _cells)
+            {
+                if (cell.Item == item)
+                {
+                    returnedCell = cell;
+                    return true;
+                }
+            }
+
+            returnedCell = null;
+            return false;
+        }
+    }
+
+    public class Cell : IReadOnlyCell
+    {
+        public Cell(Item item)
+        {
+            Item = item;
+        }
+
+        public Item Item { get; }
+
+        public int Count { get; private set; }
+
+        public void Add()
+        {
+            Count++;
+        }
+
+        public void Substract()
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Count);
+            Count--;
+        }
+    }
+
+    public interface IReadOnlyCell
+    {
+        public Item Item { get; }
+
+        public int Count { get; }
+    }
+
     public abstract class Character
     {
-        private List<Item> _items;
-
         public Character(int money)
         {
-            _items = new();
+            Inventory = new();
             TakeMoney(money);
         }
 
         public int Money { get; protected set; }
 
-        protected IReadOnlyList<Item> Items => _items;
+        protected Inventory Inventory { get; }
 
         public void TakeMoney(int money)
         {
@@ -113,12 +190,7 @@
 
         public void TakeItem(Item item)
         {
-            _items.Add(item);
-        }
-
-        protected void RemoveItem(Item item)
-        {
-            _items.Remove(item);
+            Inventory.AddItem(item);
         }
     }
 
@@ -131,23 +203,16 @@
 
         public void ShowItems()
         {
-            Dictionary<string, List<Item>> itemsCounts = SortItems();
-
-            foreach (var itemCount in itemsCounts)
+            foreach (var cell in Inventory.Cells)
             {
-                Console.WriteLine($"{itemCount.Key} - {itemCount.Value.Count} ({itemCount.Value[0].Price})");
+                Console.WriteLine($"{cell.Item.Name} - {cell.Count} ({cell.Item.Price})");
             }
         }
 
         public bool TryGetItem(string name, out Item item)
         {
             item = GetItem(name);
-            return item != null;
-        }
-
-        public int GetItemPrice(string name)
-        {
-            return GetItem(name).Price;
+            return (object)item != null;
         }
 
         public Item GiveItem(Item item)
@@ -156,20 +221,25 @@
             return item;
         }
 
-        protected Item GetItem(string name)
+        private Item GetItem(string name)
         {
             Item getedItem = null;
 
-            foreach (var item in Items)
+            foreach (var cell in Inventory.Cells)
             {
-                if (item.Name == name)
+                if (cell.Item.Name == name)
                 {
-                    getedItem = item;
+                    getedItem = cell.Item;
                     return getedItem;
                 }
             }
 
             return getedItem;
+        }
+
+        private void RemoveItem(Item item)
+        {
+            Inventory.RemoveItem(item);
         }
 
         private void Initialize(List<Item> items, int count)
@@ -182,38 +252,13 @@
                 }
             }
         }
-
-        private Dictionary<string, List<Item>> SortItems()
-        {
-            Dictionary<string, List<Item>> itemsCounts = new();
-
-            foreach (var item in Items)
-            {
-                if (itemsCounts.ContainsKey(item.Name))
-                {
-                    itemsCounts[item.Name].Add(item);
-                }
-                else
-                {
-                    itemsCounts.Add(item.Name, new List<Item>());
-                }
-            }
-
-            return itemsCounts;
-        }
     }
 
     public class Player : Character
     {
-        public Player(int money) : base(money)
-        {
+        public Player(int money) : base(money) { }
 
-        }
-
-        public bool CanPay(int price)
-        {
-            return Money >= price;
-        }
+        public bool CanPay(int price) => Money >= price;
 
         public int GiveMoney(int money)
         {
@@ -238,6 +283,18 @@
         public string Name { get; private set; }
 
         public int Price { get; private set; }
+
+        public static bool operator ==(Item a, Item b)
+        {
+            bool equalsName = a.Name == b.Name;
+            bool equalsPrice = a.Price == b.Price;
+            return equalsName && equalsPrice;
+        }
+
+        public static bool operator !=(Item a, Item b)
+        {
+            return a == b == false;
+        }
 
         public Item Clone()
         {
