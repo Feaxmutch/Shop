@@ -1,12 +1,30 @@
-﻿namespace Shop
+﻿using System.Transactions;
+
+namespace Shop
 {
     internal class Program
     {
         static void Main(string[] args)
         {
-            List<Item> items = new() { new("Яблоко", 10), new("Меч", 200), new("Щит", 150) };
-            Seller seller = new(items, 15, 500);
-            Player player = new(1000);
+            Dictionary<Item, int> itemsCounts = new()
+            {
+                { new("Яблоко", 10), 20 },
+                { new("Меч", 200), 7 },
+                { new("Щит", 150), 10 },
+            };
+
+            Inventory inventory = new();
+
+            foreach (var itemCount in itemsCounts)
+            {
+                for (int i = 0; i < itemCount.Value; i++)
+                {
+                    inventory.AddItem(itemCount.Key);
+                }
+            }
+
+            Seller seller = new(inventory, 500);
+            Player player = new(150);
             Shop shop = new(seller);
             shop.Serve(player);
         }
@@ -21,17 +39,17 @@
             _seller = seller;
         }
 
-        public void Serve(Player customer)
+        public void Serve(Player player)
         {
             const string CommandBuy = "1";
             const string CommandExit = "2";
 
-            bool isServing = true;
+            bool isServe = true;
 
-            while (isServing)
+            while (isServe)
             {
                 Console.Clear();
-                customer.ShowMoney();
+                player.ShowMoney();
                 Console.WriteLine($"{CommandBuy}) Купить предмет\n" +
                                   $"{CommandExit}) выйти из меню торговца");
                 string command = Console.ReadLine();
@@ -39,28 +57,31 @@
                 switch (command)
                 {
                     case CommandBuy:
-                        Trading(customer);
+                        Trade(player);
                         break;
 
                     case CommandExit:
-                        isServing = false;
+                        isServe = false;
                         break;
                 }
             }
         }
 
-        private void Trading(Player customer)
+        private void Trade(Player player)
         {
             Console.Clear();
+            player.ShowMoney();
+            Console.WriteLine("\nПредметы продавца:");
             _seller.ShowItems();
-            customer.ShowMoney();
+            Console.WriteLine("\nВаши предметы:");
+            player.ShowItems();
 
             Console.WriteLine($"Введите название предмета который хотите купить");
             string itemName = Console.ReadLine();
 
             if (_seller.TryGetItem(itemName, out Item item))
             {
-                if (TryDeal(customer, item))
+                if (TryDeal(player, itemName))
                 {
                     Console.WriteLine("Покупка успешна");
                 }
@@ -77,17 +98,23 @@
             Console.ReadKey();
         }
 
-        private bool TryDeal(Player customer, Item item)
+        private bool TryDeal(Player player, string itemName)
         {
-            bool canPay = customer.CanPay(item.Price);
+            bool canPay = default;
 
-            if (canPay)
+            if (_seller.TryGetItem(itemName, out Item item))
             {
-                _seller.TakeMoney(customer.GiveMoney(item.Price));
-                customer.TakeItem(_seller.GiveItem(item));
+                canPay = player.CanPay(item.Price);
+
+                if (canPay && _seller.TryGiveItem(itemName, out item))
+                {
+                    _seller.TakeMoney(player.GiveMoney(item.Price));
+                    player.TakeItem(item);
+                    return true;
+                }
             }
 
-            return canPay;
+            return false;
         }
     }
 
@@ -179,9 +206,23 @@
             TakeMoney(money);
         }
 
+        public Character(int money, Inventory inventory)
+        {
+            Inventory = inventory;
+            TakeMoney(money);
+        }
+
         public int Money { get; protected set; }
 
         protected Inventory Inventory { get; }
+
+        public void ShowItems()
+        {
+            foreach (var cell in Inventory.Cells)
+            {
+                Console.WriteLine($"{cell.Item.Name} - {cell.Count} ({cell.Item.Price})");
+            }
+        }
 
         public void TakeMoney(int money)
         {
@@ -196,18 +237,7 @@
 
     public class Seller : Character
     {
-        public Seller(List<Item> items, int count, int money) : base(money)
-        {
-            Initialize(items, count);
-        }
-
-        public void ShowItems()
-        {
-            foreach (var cell in Inventory.Cells)
-            {
-                Console.WriteLine($"{cell.Item.Name} - {cell.Count} ({cell.Item.Price})");
-            }
-        }
+        public Seller(Inventory inventory, int money) : base(money, inventory) { }
 
         public bool TryGetItem(string name, out Item item)
         {
@@ -215,10 +245,15 @@
             return (object)item != null;
         }
 
-        public Item GiveItem(Item item)
+        public bool TryGiveItem(string name, out Item item)
         {
-            RemoveItem(item);
-            return item;
+            if (TryGetItem(name, out item))
+            {
+                RemoveItem(item);
+                return true;
+            }
+
+            return false;
         }
 
         private Item GetItem(string name)
@@ -240,17 +275,6 @@
         private void RemoveItem(Item item)
         {
             Inventory.RemoveItem(item);
-        }
-
-        private void Initialize(List<Item> items, int count)
-        {
-            foreach (var item in items)
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    TakeItem(item.Clone());
-                }
-            }
         }
     }
 
