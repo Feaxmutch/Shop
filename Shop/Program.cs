@@ -108,9 +108,15 @@ namespace Shop
 
                 if (canPay && _seller.TryGiveItem(itemName, out item))
                 {
-                    _seller.TakeMoney(player.GiveMoney(item.Price));
-                    player.TakeItem(item);
-                    return true;
+                    if (player.TryBuy(item, out int money))
+                    {
+                        _seller.TakeMoney(money);
+                        return true;
+                    }
+                    else
+                    {
+                        _seller.TakeItem(item);
+                    }
                 }
             }
 
@@ -241,8 +247,18 @@ namespace Shop
 
         public bool TryGetItem(string name, out Item item)
         {
-            item = GetItem(name);
-            return (object)item != null;
+            item = null;
+
+            foreach (var cell in Inventory.Cells)
+            {
+                if (cell.Item.Name == name)
+                {
+                    item = cell.Item;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool TryGiveItem(string name, out Item item)
@@ -254,22 +270,6 @@ namespace Shop
             }
 
             return false;
-        }
-
-        private Item GetItem(string name)
-        {
-            Item getedItem = null;
-
-            foreach (var cell in Inventory.Cells)
-            {
-                if (cell.Item.Name == name)
-                {
-                    getedItem = cell.Item;
-                    return getedItem;
-                }
-            }
-
-            return getedItem;
         }
 
         private void RemoveItem(Item item)
@@ -294,9 +294,25 @@ namespace Shop
         {
             Console.WriteLine($"Монеты: {Money}");
         }
+
+       
+
+        public bool TryBuy(Item item, out int money)
+        {
+            money = 0;
+
+            if (Money >= item.Price)
+            {
+                money = item.Price;
+                Money -= item.Price;
+                TakeItem(item);
+            }
+
+            return Money >= item.Price;
+        }
     }
 
-    public class Item
+    public class Item : IItemData
     {
         public Item(string name, int price)
         {
@@ -324,5 +340,12 @@ namespace Shop
         {
             return new Item(Name, Price);
         }
+    }
+
+    public interface IItemData
+    {
+        public string Name { get; }
+
+        public int Price { get; }
     }
 }
