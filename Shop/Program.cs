@@ -300,15 +300,16 @@ namespace Shop
         public bool TryBuy(Item item, out int money)
         {
             money = 0;
+            bool canPay = CanPay(item.Price);
 
-            if (Money >= item.Price)
+            if (canPay)
             {
                 money = item.Price;
                 Money -= item.Price;
                 TakeItem(item);
             }
 
-            return Money >= item.Price;
+            return canPay;
         }
     }
 
